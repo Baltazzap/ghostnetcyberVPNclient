@@ -14,7 +14,6 @@ jobs:
 
     env:
       IS_GITHUB_ACTIONS: "1"
-      CHANNEL: "prod"
       SENTRY_DSN: ""
 
     steps:
@@ -45,7 +44,6 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.38.5"
           channel: stable
           cache: true
 
@@ -53,11 +51,15 @@ jobs:
         run: flutter doctor -v
 
       - name: Prepare Android core and generated files
+        env:
+          CHANNEL: prod
         run: |
           dart pub global activate fastforge
           make android-apk-prepare
 
       - name: Build release APK
+        env:
+          CHANNEL: prod
         run: |
           flutter build apk --release \
             --target lib/main.dart \
