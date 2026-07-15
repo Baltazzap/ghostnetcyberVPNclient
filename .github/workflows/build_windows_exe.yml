@@ -1,0 +1,74 @@
+name: Build Windows EXE
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  build-windows:
+    name: Build Windows EXE
+    runs-on: windows-latest
+
+    env:
+      IS_GITHUB_ACTIONS: "1"
+      SENTRY_DSN: ""
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.5"
+          channel: stable
+          cache: true
+
+      - name: Enable Windows desktop
+        shell: pwsh
+        run: |
+          flutter config --enable-windows-desktop
+          flutter doctor -v
+
+      - name: Download Hiddify Windows core
+        shell: pwsh
+        run: |
+          $coreVersionLine = Get-Content dependencies.properties | Where-Object { $_ -match '^core.version=' } | Select-Object -First 1
+          $coreVersion = $coreVersionLine -replace 'core.version=', ''
+          Write-Host "Core version: $coreVersion"
+          New-Item -ItemType Directory -Force -Path hiddify-core/bin | Out-Null
+          $url = "https://github.com/hiddify/hiddify-core/releases/download/v$coreVersion/hiddify-lib-windows-amd64.tar.gz"
+          curl.exe -L $url -o $env:TEMP\hiddify-lib-windows-amd64.tar.gz
+          tar -xzf $env:TEMP\hiddify-lib-windows-amd64.tar.gz -C hiddify-core/bin
+          Get-ChildItem hiddify-core/bin
+
+      - name: Flutter dependencies and generated files
+        shell: pwsh
+        run: |
+          flutter pub get
+          dart run build_runner build --delete-conflicting-outputs
+          dart run slang
+
+      - name: Build Windows release
+        shell: pwsh
+        run: |
+          flutter build windows --release --target lib/main_prod.dart --dart-define=sentry_dsn=
+
+      - name: Create portable ZIP
+        shell: pwsh
+        run: |
+          $releaseDir = "build\windows\x64\runner\Release"
+          if (!(Test-Path $releaseDir)) { throw "Release folder not found: $releaseDir" }
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Compress-Archive -Path "$releaseDir\*" -DestinationPath "dist\ChostNet-Cybver-VPN-Client-Windows-x64.zip" -Force
+          Get-ChildItem dist
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ChostNet-Windows-x64
+          path: dist/ChostNet-Cybver-VPN-Client-Windows-x64.zip
+          if-no-files-found: error
