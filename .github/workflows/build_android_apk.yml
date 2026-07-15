@@ -1,0 +1,88 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    env:
+      IS_GITHUB_ACTIONS: "1"
+      SENTRY_DSN: ""
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /opt/ghc || true
+          sudo rm -rf /opt/hostedtoolcache/CodeQL || true
+          df -h
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android packages
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358" "cmake;3.22.1"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter doctor
+        run: flutter doctor -v
+
+      - name: Download Hiddify Android core
+        shell: bash
+        run: |
+          set -e
+          CORE_VERSION=$(grep '^core.version=' dependencies.properties | cut -d= -f2)
+          echo "Core version: ${CORE_VERSION}"
+          mkdir -p android/app/libs
+          curl -L "https://github.com/hiddify/hiddify-core/releases/download/v${CORE_VERSION}/hiddify-lib-android.tar.gz" -o /tmp/hiddify-lib-android.tar.gz
+          tar xzf /tmp/hiddify-lib-android.tar.gz -C android/app/libs/
+          find android/app/libs -maxdepth 2 -type f | head -50
+
+      - name: Flutter dependencies and generated files
+        run: |
+          flutter pub get
+          dart run build_runner build --delete-conflicting-outputs
+          dart run slang
+
+      - name: Build release APK
+        run: |
+          flutter build apk --release \
+            --target lib/main_prod.dart \
+            --target-platform android-arm,android-arm64,android-x64 \
+            --dart-define=sentry_dsn=
+
+      - name: List APK files
+        run: |
+          find build/app/outputs -name "*.apk" -type f -print -exec ls -lh {} \;
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ChostNet-Android-APK
+          path: |
+            build/app/outputs/flutter-apk/*.apk
+            build/app/outputs/apk/release/*.apk
+          if-no-files-found: error
