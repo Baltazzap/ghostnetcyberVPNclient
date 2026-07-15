@@ -1,0 +1,5 @@
+Сборочные workflow исправлены:
+- больше нет CHANNEL=prod в global env, поэтому subosito/flutter-action не падает;
+- больше нет неверного флага --build-dart-define в flutter build;
+- используется правильный флаг --dart-define=sentry_dsn=;
+- Android и Windows скачивают hiddify-core автоматически.

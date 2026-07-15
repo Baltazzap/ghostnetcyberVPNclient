@@ -1,0 +1,18 @@
+{
+    "name": "GhostNet Cyber VPN",
+    "short_name": "GhostNet",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#050505",
+    "theme_color": "#FF7A00",
+    "description": "GhostNet Cyber VPN",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "icon.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}
